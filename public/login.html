@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in · Gaanasudha Musical Academy</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎼</text></svg>" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <form class="login-card" id="loginForm">
+      <div class="brand">
+        <div class="logo">🎼</div>
+        <h1>Gaanasudha</h1>
+        <p>Musical Academy · Music Library</p>
+      </div>
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" required autofocus />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <button type="submit">Sign in</button>
+      <div class="form-error" id="error"></div>
+      <div class="hint">Access provided by the academy administrator.</div>
+    </form>
+  </div>
+  <script src="/js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shared music · Gaanasudha Musical Academy</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎼</text></svg>" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="login-wrap" style="align-items:flex-start;padding-top:6vh">
+    <div style="width:100%;max-width:560px">
+      <div class="brand" style="margin-bottom:18px">
+        <div class="logo">🎼</div>
+        <h1>Gaanasudha Musical Academy</h1>
+        <p id="shareTitle">Shared music</p>
+      </div>
+
+      <!-- Password gate -->
+      <div class="login-card" id="pwGate" style="display:none">
+        <label for="pw">This link is password protected</label>
+        <input id="pw" type="password" placeholder="Enter password" />
+        <button id="pwBtn" style="width:100%;margin-top:16px">Unlock</button>
+        <div class="form-error" id="pwErr"></div>
+      </div>
+
+      <!-- Track list -->
+      <div id="content" style="display:none">
+        <div id="trackList"></div>
+        <footer class="player" style="position:sticky;bottom:0;margin-top:20px;border-radius:12px;border:1px solid var(--border);height:76px">
+          <div class="np">
+            <img class="cover cover-fallback" id="npCover" alt="" />
+            <div class="t">
+              <div class="title" id="npTitle">Select a song</div>
+              <div class="artist" id="npArtist">—</div>
+            </div>
+          </div>
+          <div class="controls"><button class="play" id="playBtn">▶</button></div>
+          <div class="bar">
+            <span class="time" id="curTime">0:00</span>
+            <input type="range" id="seek" value="0" min="0" max="1000" />
+            <span class="time" id="durTime">0:00</span>
+          </div>
+          <audio id="audio"></audio>
+        </footer>
+      </div>
+
+      <div class="empty" id="errorBox" style="display:none"></div>
+    </div>
+  </div>
+  <script src="/js/share.js"></script>
+</body>
+</html>

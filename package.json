@@ -1,0 +1,25 @@
+{
+  "name": "gaanasudha-music-portal",
+  "version": "1.0.0",
+  "description": "Self-hosted music library web portal for Gaanasudha Musical Academy",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "scan": "node scripts/scan.js",
+    "samples": "node scripts/make-samples.js",
+    "service:install": "node scripts/install-service.js",
+    "service:uninstall": "node scripts/uninstall-service.js"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "compression": "^1.8.1",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "multer": "^2.0.1",
+    "music-metadata": "^11.0.0",
+    "node-windows": "^1.0.0-beta.8",
+    "qrcode": "^1.5.4"
+  }
+}

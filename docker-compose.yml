@@ -1,0 +1,37 @@
+# Run the Gaanasudha Music Portal on the NAS.
+#   docker compose up -d --build
+#
+# The app + a fixed public URL (via ngrok) run as two containers, restarting
+# automatically so they survive NAS reboots. The PC can be off.
+
+services:
+  app:
+    build: .
+    container_name: gaanasudha-music
+    restart: unless-stopped
+    ports:
+      - "3080:3080"
+    environment:
+      - PORT=3080
+      # Set a long random value (keeps logins valid across restarts):
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-to-a-long-random-string}
+    volumes:
+      # Put your audio here (or point this at your existing NAS music share).
+      - ./music:/app/music
+      # App data: users, playlists, shares, library index, album art. Back this up.
+      - ./data:/app/data
+
+  # Fixed public HTTPS URL — free ngrok static domain. Works whenever the NAS is on.
+  # 1) Create a free account at https://ngrok.com
+  # 2) Copy your authtoken (dashboard → Your Authtoken)
+  # 3) Claim your free static domain (dashboard → Domains) e.g. gaana-xyz.ngrok-free.app
+  # 4) Put both below, then: docker compose up -d
+  tunnel:
+    image: ngrok/ngrok:latest
+    container_name: gaanasudha-tunnel
+    restart: unless-stopped
+    command: http --url=${NGROK_DOMAIN} app:3080
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - app

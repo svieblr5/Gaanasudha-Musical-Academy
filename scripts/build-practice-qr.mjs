@@ -1,0 +1,59 @@
+// Builds a printable QR poster (public/practice-share.html) pointing at the
+// public practice-tools URL, so teachers can hand it out / stick it on the wall.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import QRCode from 'qrcode';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const URL = 'https://equinox-jittery-crabbing.ngrok-free.dev/practice.html';
+
+const qr = await QRCode.toString(URL, {
+  type: 'svg',
+  margin: 1,
+  color: { dark: '#1e1f3a', light: '#ffffff' },
+});
+
+const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gaanasudha Practice Tools · Scan to open</title>
+  <style>
+    @media print { body { background:#fff; } .noprint { display:none; } }
+    body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      background:#f4f4fb; color:#1e1f3a; font-family:'Segoe UI',system-ui,sans-serif; padding:24px; }
+    .poster { background:#fff; border:2px solid #e5b567; border-radius:20px; padding:40px 48px;
+      max-width:520px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.12); }
+    .logo { font-size:52px; }
+    h1 { margin:8px 0 2px; font-size:28px; }
+    .sub { color:#6a6a8c; margin:0 0 18px; font-size:15px; }
+    .qr { width:300px; height:300px; margin:6px auto 14px; }
+    .qr svg { width:100%; height:100%; }
+    .tools { font-size:17px; font-weight:600; margin:4px 0 10px; }
+    .url { font-size:13px; color:#6a6a8c; word-break:break-all; }
+    .hint { margin-top:16px; font-size:13px; color:#8a8aa2; }
+    .print-btn { margin-top:18px; background:#e5b567; color:#22160a; border:none; border-radius:10px;
+      padding:10px 20px; font-size:15px; font-weight:600; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="poster">
+    <div class="logo">🎼</div>
+    <h1>Gaanasudha Practice Tools</h1>
+    <p class="sub">Musical Academy</p>
+    <div class="qr">${qr}</div>
+    <div class="tools">🪗 Shruti Box · 🎼 Tanpura · 🥁 Tala</div>
+    <p class="sub">Scan with your phone camera to open — works in any browser, no app needed.</p>
+    <p class="url">${URL}</p>
+    <p class="hint">Tap a Start / Power button to begin (phones need one tap before sound).</p>
+    <button class="print-btn noprint" onclick="window.print()">🖨 Print this poster</button>
+  </div>
+</body>
+</html>
+`;
+
+const out = path.join(ROOT, 'public', 'practice-share.html');
+fs.writeFileSync(out, html);
+console.log('Wrote', out, `(${(html.length / 1024).toFixed(1)} KB)`);

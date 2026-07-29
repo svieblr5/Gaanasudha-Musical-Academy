@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Gaanasudha Musical Academy's private music library — stream lessons, recitals and practice tracks, with tanpura, shruti box and tala tools." />
+  <meta name="theme-color" content="#0f1020" />
+  <meta name="color-scheme" content="dark" />
+  <title>Gaanasudha Musical Academy · Library</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎼</text></svg>" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎼</text></svg>" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Top bar -->
+    <header class="topbar">
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">☰</button>
+      <div class="brand" id="brand" title="Go to Home">
+        <span class="logo">🎼</span>
+        <span class="title">Gaanasudha</span>
+      </div>
+      <div class="search" id="searchWrap">
+        <span class="search-ico">🔍</span>
+        <input id="search" type="search" placeholder="Search songs, artists, albums…" autocomplete="off" />
+        <button class="search-clear" id="searchClear" title="Clear search">✕</button>
+        <div class="search-suggest" id="searchSuggest"></div>
+      </div>
+      <div class="user" id="userMenu">
+        <button class="avatar-btn" id="avatarBtn">
+          <span class="avatar" id="avatar"></span>
+          <span class="uname" id="userName"></span>
+          <span class="chev">▾</span>
+        </button>
+        <div class="user-dropdown" id="userDropdown"></div>
+      </div>
+    </header>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+      <div class="nav-item active" data-view="home"><span class="ico">🏠</span> Home</div>
+      <div class="nav-sep">Browse</div>
+      <div class="nav-item" data-view="library"><span class="ico">🎵</span> All Songs</div>
+      <div class="nav-item" data-view="albums"><span class="ico">💿</span> Albums</div>
+      <div class="nav-item" data-view="artists"><span class="ico">🎤</span> Artists</div>
+      <div class="nav-item" data-view="genres"><span class="ico">🎧</span> Genres</div>
+      <div class="nav-sep">Your Music</div>
+      <div class="nav-item" data-view="favorites"><span class="ico">❤️</span> Favorites</div>
+      <div class="nav-item" data-view="recent"><span class="ico">🕒</span> Recently Played</div>
+      <div class="nav-item" data-view="top"><span class="ico">🔥</span> Most Played</div>
+      <div class="nav-item" data-view="playlists"><span class="ico">📃</span> Playlists</div>
+      <div class="nav-item" data-view="shares"><span class="ico">🔗</span> Share Links</div>
+      <div class="nav-sep">Practice</div>
+      <div class="nav-item" data-view="practice"><span class="ico">🎼</span> Tanpura &amp; Tala</div>
+      <div class="nav-item" data-view="practice-share"><span class="ico">📲</span> Share / QR</div>
+      <div class="nav-sep">Account</div>
+      <div class="nav-item" data-view="account"><span class="ico">👤</span> My Account</div>
+      <div class="nav-sep admin-only" style="display:none">Administration</div>
+      <div class="nav-item admin-only" data-view="upload" style="display:none"><span class="ico">⬆️</span> Upload Music</div>
+      <div class="nav-item admin-only" data-view="users" style="display:none"><span class="ico">👥</span> Users</div>
+    </nav>
+    <div class="nav-backdrop" id="navBackdrop" hidden></div>
+
+    <!-- Main content -->
+    <main class="main">
+      <!-- Home -->
+      <section class="view active" id="view-home">
+        <h2 id="homeGreeting">Welcome</h2>
+        <p class="sub">Your music, front and centre.</p>
+        <div id="homeShelves"></div>
+      </section>
+
+      <!-- Library -->
+      <section class="view" id="view-library">
+        <h2>Library</h2>
+        <p class="sub" id="librarySub">Your academy's music collection.</p>
+        <div class="stat-grid" id="stats"></div>
+        <div class="toolbar">
+          <button class="gold" id="playAllBtn">▶ Play all</button>
+          <button class="ghost" id="shuffleAllBtn">🔀 Shuffle all</button>
+          <select id="sort">
+            <option value="title">Sort: Title</option>
+            <option value="artist">Sort: Artist</option>
+            <option value="album">Sort: Album</option>
+            <option value="year">Sort: Year</option>
+          </select>
+          <span class="spacer"></span>
+          <button class="ghost tiny admin-only" id="rescanBtn" style="display:none">↻ Rescan library</button>
+        </div>
+        <div id="trackTableWrap"></div>
+      </section>
+
+      <!-- Albums -->
+      <section class="view" id="view-albums">
+        <h2>Albums</h2>
+        <p class="sub">Browse your collection by album.</p>
+        <div class="card-list" id="albumGrid"></div>
+      </section>
+
+      <!-- Album detail -->
+      <section class="view" id="view-album">
+        <button class="ghost tiny" id="albumBack" style="margin-bottom:14px">← Back to albums</button>
+        <div id="albumDetail"></div>
+      </section>
+
+      <!-- Artists -->
+      <section class="view" id="view-artists">
+        <h2>Artists</h2>
+        <p class="sub">Browse your collection by artist.</p>
+        <div class="card-list" id="artistGrid"></div>
+      </section>
+
+      <!-- Artist detail -->
+      <section class="view" id="view-artist">
+        <button class="ghost tiny" id="artistBack" style="margin-bottom:14px">← Back to artists</button>
+        <div id="artistDetail"></div>
+      </section>
+
+      <!-- Favorites -->
+      <section class="view" id="view-favorites">
+        <h2>Favorites</h2>
+        <p class="sub">Songs you've marked with ❤.</p>
+        <div class="toolbar"><button class="gold" id="favPlayBtn">▶ Play all</button></div>
+        <div id="favWrap"></div>
+      </section>
+
+      <!-- Recently played -->
+      <section class="view" id="view-recent">
+        <h2>Recently Played</h2>
+        <p class="sub">Your listening history.</p>
+        <div id="recentWrap"></div>
+      </section>
+
+      <!-- Most played -->
+      <section class="view" id="view-top">
+        <h2>Most Played</h2>
+        <p class="sub">The academy's most-played songs.</p>
+        <div id="topWrap"></div>
+      </section>
+
+      <!-- Genres -->
+      <section class="view" id="view-genres">
+        <h2>Genres</h2>
+        <p class="sub">Browse by style.</p>
+        <div class="card-list" id="genreGrid"></div>
+      </section>
+
+      <!-- Genre detail -->
+      <section class="view" id="view-genre">
+        <button class="ghost tiny" id="genreBack" style="margin-bottom:14px">← Back to genres</button>
+        <div id="genreDetail"></div>
+      </section>
+
+      <!-- Queue -->
+      <section class="view" id="view-queue">
+        <h2>Play Queue</h2>
+        <p class="sub">What's playing now and coming up next.</p>
+        <div class="toolbar"><button class="ghost" id="clearQueueBtn">Clear queue</button></div>
+        <div id="queueWrap"></div>
+      </section>
+
+      <!-- Playlists -->
+      <section class="view" id="view-playlists">
+        <h2>Playlists</h2>
+        <p class="sub">Group songs for lessons, recitals, or practice.</p>
+        <div class="toolbar">
+          <button class="gold" id="newPlaylistBtn">+ New playlist</button>
+        </div>
+        <div class="card-list" id="playlistList"></div>
+        <div id="playlistDetail" style="margin-top:24px"></div>
+      </section>
+
+      <!-- Shares -->
+      <section class="view" id="view-shares">
+        <h2>Share Links</h2>
+        <p class="sub">Public links you can send via WhatsApp or email. No account needed to listen.</p>
+        <div class="toolbar"><button class="gold" id="newShareBtn">＋ New share link</button></div>
+        <div class="card-list" id="shareList"></div>
+      </section>
+
+      <!-- Practice: Tanpura + Tala metronome -->
+      <section class="view" id="view-practice">
+        <h2>Tanpura &amp; Tala</h2>
+        <p class="sub">Practice companions — a shruti drone and a tala keeper. They keep playing even while you browse the library.</p>
+        <div id="practicePanel"></div>
+      </section>
+
+      <!-- Account -->
+      <section class="view" id="view-account">
+        <h2>My Account</h2>
+        <p class="sub">Update your password.</p>
+        <div class="pcard" style="max-width:420px">
+          <label>Current password</label>
+          <input id="curPw" type="password" style="width:100%" />
+          <label style="margin-top:10px;display:block">New password (6+ characters)</label>
+          <input id="newPw" type="password" style="width:100%" />
+          <div class="row" style="margin-top:16px"><button class="gold" id="changePwBtn">Change password</button></div>
+          <div class="msg" id="pwMsg"></div>
+        </div>
+      </section>
+
+      <!-- Upload (admin) -->
+      <section class="view" id="view-upload">
+        <h2>Upload Music</h2>
+        <p class="sub">Add audio files. For 10,000+ songs, copy directly to the <code>music</code> folder and use “Rescan”.</p>
+        <div class="upload-drop" id="dropZone">
+          Drag &amp; drop audio files here, or
+          <label style="color:var(--gold-2);cursor:pointer"> browse
+            <input type="file" id="fileInput" multiple accept="audio/*" style="display:none" />
+          </label>
+        </div>
+        <div id="uploadStatus"></div>
+      </section>
+
+      <!-- Users (admin) -->
+      <section class="view" id="view-users">
+        <h2>Users</h2>
+        <p class="sub">Create accounts for staff and students.</p>
+        <div class="toolbar"><button class="gold" id="newUserBtn">+ Add user</button></div>
+        <div id="userTableWrap"></div>
+      </section>
+    </main>
+
+    <!-- Player -->
+    <footer class="player">
+      <div class="np" id="npInfo" title="Open now playing">
+        <img class="cover cover-fallback" id="npCover" alt="" />
+        <div class="t">
+          <div class="title" id="npTitle">Nothing playing</div>
+          <div class="artist" id="npArtist">—</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="shuffleBtn" title="Shuffle" aria-label="Shuffle">🔀</button>
+        <button id="prevBtn" title="Previous" aria-label="Previous track">⏮</button>
+        <button class="play" id="playBtn" title="Play/Pause" aria-label="Play or pause">▶</button>
+        <button id="nextBtn" title="Next" aria-label="Next track">⏭</button>
+        <button id="repeatBtn" title="Repeat" aria-label="Repeat">🔁</button>
+      </div>
+      <div class="bar">
+        <span class="time" id="curTime">0:00</span>
+        <input type="range" id="seek" value="0" min="0" max="1000" />
+        <span class="time" id="durTime">0:00</span>
+      </div>
+      <div class="vol">
+        <span>🔊</span>
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="1" />
+      </div>
+      <div class="player-extra">
+        <button id="autoplayBtn" class="on" title="Autoplay similar songs when the queue ends" aria-label="Toggle autoplay">∞</button>
+        <button id="queueBtn" title="Play queue" aria-label="Show play queue">☰</button>
+        <button id="expandBtn" title="Now playing" aria-label="Open now playing screen">⤢</button>
+      </div>
+      <audio id="audio"></audio>
+    </footer>
+
+    <!-- Full-screen Now Playing -->
+    <div class="np-screen" id="npScreen">
+      <button class="np-close" id="npClose" title="Close">✕</button>
+      <div class="np-screen-inner">
+        <img class="np-big-art" id="npBigArt" alt="" />
+        <div class="np-big-meta">
+          <h2 id="npBigTitle">—</h2>
+          <p id="npBigArtist">—</p>
+        </div>
+        <div class="np-tools">
+          <label>Tempo <span class="muted" style="font-weight:400">(pitch kept)</span>
+            <select id="speedSel">
+              <option value="0.5">0.5×</option>
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1× (normal)</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="2">2×</option>
+            </select>
+          </label>
+          <div class="transpose">
+            <span>Transpose:</span>
+            <button class="ghost tiny" id="trDown" title="Down a semitone">−</button>
+            <span class="tr-val" id="trVal">0</span>
+            <button class="ghost tiny" id="trUp" title="Up a semitone">+</button>
+            <span class="muted" id="trHint">original key</span>
+            <button class="ghost tiny" id="trReset">Reset</button>
+          </div>
+          <div class="ab-loop">
+            <span>A–B loop:</span>
+            <button class="ghost tiny" id="abA">Set A</button>
+            <button class="ghost tiny" id="abB">Set B</button>
+            <button class="ghost tiny" id="abClear">Clear</button>
+            <span class="muted" id="abStatus">off</span>
+          </div>
+          <label>Sleep timer
+            <select id="sleepSel">
+              <option value="0" selected>Off</option>
+              <option value="5">5 min</option>
+              <option value="10">10 min</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60">60 min</option>
+            </select>
+          </label>
+        </div>
+        <div class="np-eq">
+          <div class="np-eq-head">
+            <span class="np-eq-title">🎚 Equalizer</span>
+            <select id="eqPreset">
+              <option value="Flat" selected>Flat</option>
+              <option value="Vocal Clarity">Vocal Clarity</option>
+              <option value="Warm">Warm</option>
+              <option value="Bright">Bright</option>
+              <option value="Bass Boost">Bass Boost</option>
+              <option value="Treble Boost">Treble Boost</option>
+              <option value="Classical">Classical</option>
+              <option value="Instrumental">Instrumental</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+          <div class="eq-bands">
+            <div class="eq-band"><input type="range" class="eq-slider" id="eqBand0" min="-12" max="12" step="1" value="0" /><span class="eq-val" id="eqVal0">0</span><span class="eq-f">80</span></div>
+            <div class="eq-band"><input type="range" class="eq-slider" id="eqBand1" min="-12" max="12" step="1" value="0" /><span class="eq-val" id="eqVal1">0</span><span class="eq-f">250</span></div>
+            <div class="eq-band"><input type="range" class="eq-slider" id="eqBand2" min="-12" max="12" step="1" value="0" /><span class="eq-val" id="eqVal2">0</span><span class="eq-f">800</span></div>
+            <div class="eq-band"><input type="range" class="eq-slider" id="eqBand3" min="-12" max="12" step="1" value="0" /><span class="eq-val" id="eqVal3">0</span><span class="eq-f">2.5k</span></div>
+            <div class="eq-band"><input type="range" class="eq-slider" id="eqBand4" min="-12" max="12" step="1" value="0" /><span class="eq-val" id="eqVal4">0</span><span class="eq-f">6k</span></div>
+            <div class="eq-band"><input type="range" class="eq-slider" id="eqBand5" min="-12" max="12" step="1" value="0" /><span class="eq-val" id="eqVal5">0</span><span class="eq-f">12k</span></div>
+          </div>
+          <div class="eq-scale"><span>+12 dB</span><span>0</span><span>−12 dB</span></div>
+        </div>
+        <div class="np-lyrics" id="npLyrics"><span class="muted">Lyrics will appear here if available.</span></div>
+      </div>
+    </div>
+
+    <!-- Row context menu -->
+    <div class="ctx-menu" id="ctxMenu"></div>
+  </div>
+
+  <!-- Generic modal -->
+  <div class="modal-back" id="modalBack">
+    <div class="modal" id="modal"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/practice-tools.js"></script>
+  <script>
+    // Register the service worker for installability + offline app shell.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

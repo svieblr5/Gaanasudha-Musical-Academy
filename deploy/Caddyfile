@@ -1,0 +1,27 @@
+# Caddy reverse proxy for the Gaanasudha Music Portal.
+# Caddy automatically obtains and renews a free HTTPS certificate from
+# Let's Encrypt (needs ports 80 + 443 reachable from the internet).
+#
+# 1. Replace music.gaanasudhamusic.com below if your subdomain differs.
+# 2. Make sure the app service is running on localhost:3080 (it already is).
+# 3. Run:  caddy run --config "G:\Gaanasudha Musical Academy\deploy\Caddyfile"
+#    (or install it as a service — see DEPLOY-HOSTINGER.md)
+#
+# Note: the app already sets CSP / X-Frame-Options / etc. itself, so this file
+# only adds HSTS (which belongs at the HTTPS edge) and compression.
+
+music.gaanasudhamusic.com {
+	encode zstd gzip
+
+	# Tell browsers to stick to HTTPS for a year (safe on your own domain).
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	reverse_proxy localhost:3080 {
+		# Pass the real client IP + scheme so the app's login throttling and
+		# secure-cookie ("auto") logic see the true HTTPS request.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		# Stream audio through without buffering (smooth seeking).
+		flush_interval -1
+	}
+}
