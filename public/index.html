@@ -54,6 +54,8 @@
       <div class="nav-sep">Practice</div>
       <div class="nav-item" data-view="practice"><span class="ico">🎼</span> Tanpura &amp; Tala</div>
       <div class="nav-item" data-view="practice-share"><span class="ico">📲</span> Share / QR</div>
+      <div class="nav-sep">Studio</div>
+      <div class="nav-item" data-view="studio"><span class="ico">🎚️</span> Studio / Mixer</div>
       <div class="nav-sep">Account</div>
       <div class="nav-item" data-view="account"><span class="ico">👤</span> My Account</div>
       <div class="nav-sep admin-only" style="display:none">Administration</div>
@@ -184,6 +186,13 @@
         <h2>Tanpura &amp; Tala</h2>
         <p class="sub">Practice companions — a shruti drone and a tala keeper. They keep playing even while you browse the library.</p>
         <div id="practicePanel"></div>
+      </section>
+
+      <!-- Studio / Mixer -->
+      <section class="view" id="view-studio">
+        <h2>Studio / Mixer</h2>
+        <p class="sub">A live &amp; post-production console — mix mic + tracks with noise reduction, auto-ducking, voice enhance, EQ, reverb, a limiter, and record the mix.</p>
+        <div id="studioPanel"></div>
       </section>
 
       <!-- Account -->
@@ -343,6 +352,7 @@
 
   <script src="/js/app.js"></script>
   <script src="/js/practice-tools.js"></script>
+  <script src="/js/studio.js"></script>
   <script>
     // Register the service worker for installability + offline app shell.
     if ('serviceWorker' in navigator) {

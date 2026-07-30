@@ -36,13 +36,15 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  // Mic is allowed for same-origin (the Studio mixer needs it); camera/geo stay off.
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(self)');
   res.setHeader(
     'Content-Security-Policy',
     [
       "default-src 'self'",
       "img-src 'self' data:",
-      "media-src 'self'",
+      // blob: needed for uploaded-file playback + recorded-mix download in Studio.
+      "media-src 'self' blob:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline'",
       "worker-src 'self'",

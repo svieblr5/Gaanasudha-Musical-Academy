@@ -357,6 +357,7 @@ function setupUserMenu() {
   );
   dd.querySelector('button[data-logout]').addEventListener('click', async () => {
     window.PracticeTools?.stopAll();
+    window.Studio?.stopAll();
     await api('/api/logout', { method: 'POST' });
     location.href = '/login.html';
   });
