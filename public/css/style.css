@@ -629,3 +629,8 @@ tbody tr.playing { background: rgba(108, 92, 231, 0.18); }
 .ms-eq .knob { flex: 1; }
 #sceneSel { max-width: 150px; }
 .studio-toolbar select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; font-size: 13px; }
+
+/* Studio: SNR (spectral denoise) row */
+.snr-row { display: flex; gap: 4px; width: 100%; }
+.snr-row button { flex: 1; }
+.fx-row { flex-wrap: wrap; }

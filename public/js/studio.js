@@ -19,6 +19,21 @@
   let chSeq = 0;
   let recorder = null;
   let recChunks = [];
+  let denoiseReady = false;
+
+  // Lazily load the spectral-denoise AudioWorklet module into this context.
+  async function ensureDenoiseModule() {
+    if (denoiseReady) return true;
+    try {
+      await audio().audioWorklet.addModule('/js/denoise-worklet.js');
+      denoiseReady = true;
+      return true;
+    } catch (e) {
+      console.error('Denoiser unavailable:', e);
+      toast('Spectral denoiser not supported in this browser');
+      return false;
+    }
+  }
 
   // ---- helpers ----
   const q = (s) => panel.querySelector(s);
@@ -182,11 +197,35 @@
       hbuf: new Float32Array(n.highAn.fftSize),
       mbuf: new Float32Array(n.postAn.fftSize),
       mute: false, solo: false,
-      denoise: false, comp: false, deEss: false, autoLevel: false, hum: false,
+      denoise: false, comp: false, deEss: false, autoLevel: false, hum: false, snr: false,
       gateThresh: 0.015,
     };
     channels.push(ch);
     return ch;
+  }
+
+  // Spectral noise reduction: insert the denoise worklet (once) into the channel
+  // chain (inGain → denoiser → hpf) and toggle it via the worklet's enable flag.
+  async function applySNR(ch) {
+    if (ch.snr) {
+      if (!(await ensureDenoiseModule())) { ch.snr = false; renderChannels(); return; }
+      if (!ch.n.denoiser) {
+        const node = new AudioWorkletNode(ctx, 'spectral-denoise');
+        node.port.onmessage = (e) => { if (e.data && e.data.type === 'learned') toast(`Noise learned on “${ch.name}”`); };
+        try { ch.n.inGain.disconnect(ch.n.hpf); } catch (_) {}
+        ch.n.inGain.connect(node); node.connect(ch.n.hpf);
+        ch.n.denoiser = node;
+      }
+      ch.n.denoiser.port.postMessage({ type: 'enabled', value: true });
+    } else if (ch.n.denoiser) {
+      ch.n.denoiser.port.postMessage({ type: 'enabled', value: false });
+    }
+  }
+
+  function learnNoise(ch) {
+    if (!ch.snr || !ch.n.denoiser) return toast('Turn on SNR first');
+    ch.n.denoiser.port.postMessage({ type: 'learn', frames: 60 });
+    toast('Learning noise… keep it quiet (noise only) for ~1s');
   }
 
   // De-hum: notch the mains frequency + 2 harmonics (transparent 'allpass' off).
@@ -321,6 +360,7 @@
     try { ch.mediaEl && ch.mediaEl.pause(); } catch (_) {}
     try { ch.stream && ch.stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
     try { ch.n.duck.disconnect(); ch.n.revSend.disconnect(); ch.n.delaySend.disconnect(); } catch (_) {}
+    try { ch.n.denoiser && ch.n.denoiser.disconnect(); } catch (_) {}
     channels.splice(i, 1);
     renderChannels();
   }
@@ -664,8 +704,12 @@
         <button class="fx ${ch.deEss ? 'on' : ''}" data-fx="deEss" title="De-esser">DS</button>
         <button class="fx ${ch.autoLevel ? 'on' : ''}" data-fx="autoLevel" title="Auto-level (AGC)">AUTO</button>
         <button class="fx ${ch.hum ? 'on' : ''}" data-fx="hum" title="De-hum (mains 50/60 Hz notch)">HUM</button>
+        <button class="fx ${ch.snr ? 'on' : ''}" data-fx="snr" title="Spectral noise reduction (learn-noise)">SNR</button>
       </div>
-      <button class="ghost tiny enhance" title="Voice enhance preset">✨ Voice</button>
+      <div class="snr-row">
+        <button class="ghost tiny enhance" title="Voice enhance preset">✨ Voice</button>
+        <button class="ghost tiny snr-learn" title="Learn the room/background noise (play noise only, then click)">🎧 Learn</button>
+      </div>
       <label class="mini">Rev <input type="range" class="rev" min="0" max="1" step="0.01" value="${ch.n.revSend.gain.value}" /></label>
       <label class="mini">Dly <input type="range" class="dly" min="0" max="1" step="0.01" value="${ch.n.delaySend.gain.value}" /></label>
       <label class="mini">Pan <input type="range" class="pan" min="-1" max="1" step="0.05" value="${ch.n.pan ? ch.n.pan.pan.value : 0}" /></label>
@@ -708,9 +752,11 @@
           if (fx === 'denoise') ch.n.hpf.frequency.value = ch.denoise ? 95 : 25;
           if (fx === 'deEss' && !ch.deEss) ch.n.deEss.gain.value = 0;
           if (fx === 'hum') setHum(ch, ch.hum);
+          if (fx === 'snr') applySNR(ch);
         }),
       );
       el.querySelector('.enhance').addEventListener('click', () => voiceEnhance(ch));
+      el.querySelector('.snr-learn').addEventListener('click', () => learnNoise(ch));
       el.querySelector('.rev').addEventListener('input', (e) => (ch.n.revSend.gain.value = Number(e.target.value)));
       el.querySelector('.dly').addEventListener('input', (e) => (ch.n.delaySend.gain.value = Number(e.target.value)));
       el.querySelector('.pan').addEventListener('input', (e) => { if (ch.n.pan) ch.n.pan.pan.value = Number(e.target.value); });

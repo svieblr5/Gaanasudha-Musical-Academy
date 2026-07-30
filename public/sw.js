@@ -1,7 +1,7 @@
 // Service worker: installable app shell + offline caching.
 // Deliberately never intercepts /api/* (auth, data, and audio streaming with
 // Range requests) — those always go straight to the network.
-const CACHE = 'gaanasudha-v4';
+const CACHE = 'gaanasudha-v5';
 const SHELL = [
   '/',
   '/index.html',
@@ -12,6 +12,8 @@ const SHELL = [
   '/js/login.js',
   '/js/practice-tools.js',
   '/js/pitch-shift-worklet.js',
+  '/js/studio.js',
+  '/js/denoise-worklet.js',
   '/manifest.json',
   '/icon.svg',
   '/icon-192.png',
