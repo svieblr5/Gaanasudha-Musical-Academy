@@ -64,6 +64,19 @@
     master.reverbType = 'Hall';
     setReverbType('Hall');
 
+    // Delay / echo aux (channels send here; feedback loop; return to the bus).
+    master.delay = ctx.createDelay(2.0);
+    master.delay.delayTime.value = 0.28;
+    master.delayFb = ctx.createGain(); master.delayFb.gain.value = 0.3;
+    master.delayReturn = ctx.createGain(); master.delayReturn.gain.value = 0.9;
+    master.delay.connect(master.delayFb).connect(master.delay);
+    master.delay.connect(master.delayReturn).connect(master.bus);
+
+    // Master 3-band EQ (shapes the whole mix before the limiter).
+    master.mEqLow = ctx.createBiquadFilter(); master.mEqLow.type = 'lowshelf'; master.mEqLow.frequency.value = 180;
+    master.mEqMid = ctx.createBiquadFilter(); master.mEqMid.type = 'peaking'; master.mEqMid.frequency.value = 1200; master.mEqMid.Q.value = 0.8;
+    master.mEqHigh = ctx.createBiquadFilter(); master.mEqHigh.type = 'highshelf'; master.mEqHigh.frequency.value = 4500;
+
     // Master limiter (brickwall-ish) — on by default to catch peaks.
     master.limiter = ctx.createDynamicsCompressor();
     setLimiter(true);
@@ -75,7 +88,10 @@
     master.analyser.fftSize = 1024;
     master.peakBuf = new Float32Array(master.analyser.fftSize);
 
-    master.bus.connect(master.limiter);
+    master.bus.connect(master.mEqLow);
+    master.mEqLow.connect(master.mEqMid);
+    master.mEqMid.connect(master.mEqHigh);
+    master.mEqHigh.connect(master.limiter);
     master.limiter.connect(master.gain);
     master.gain.connect(master.analyser);
     master.analyser.connect(ctx.destination);
@@ -144,9 +160,11 @@
     afterFader.connect(n.duck);
     n.duck.connect(master.bus);
 
-    // reverb send
+    // reverb + delay sends
     n.revSend = c.createGain(); n.revSend.gain.value = 0;
     afterFader.connect(n.revSend); n.revSend.connect(reverb);
+    n.delaySend = c.createGain(); n.delaySend.gain.value = 0;
+    afterFader.connect(n.delaySend); n.delaySend.connect(master.delay);
 
     const ch = {
       id, type, name: name || (type === 'mic' ? `Mic ${id}` : `Track ${id}`),
@@ -196,13 +214,15 @@
   }
 
   // Add an academy library track as a channel (backing bed / SFX).
-  function addLibrary(id, name) {
+  function addLibrary(id, name, silent) {
     const c = audio();
     const el = new Audio();
     el.src = `/api/stream/${id}`; // same-origin; the session cookie authorizes it
     const src = c.createMediaElementSource(el);
-    makeChannel({ type: 'file', name: name || `Track ${id}`, sourceNode: src, mediaEl: el });
-    renderChannels();
+    const ch = makeChannel({ type: 'file', name: name || `Track ${id}`, sourceNode: src, mediaEl: el });
+    ch.libId = id; // lets Scenes recreate it later
+    if (!silent) renderChannels();
+    return ch;
   }
 
   async function openLibraryPicker() {
@@ -283,7 +303,7 @@
     const ch = channels[i];
     try { ch.mediaEl && ch.mediaEl.pause(); } catch (_) {}
     try { ch.stream && ch.stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
-    try { ch.n.duck.disconnect(); ch.n.revSend.disconnect(); } catch (_) {}
+    try { ch.n.duck.disconnect(); ch.n.revSend.disconnect(); ch.n.delaySend.disconnect(); } catch (_) {}
     channels.splice(i, 1);
     renderChannels();
   }
@@ -356,10 +376,12 @@
     const fill = q('#masterMeter');
     if (!fill) return;
     master.analyser.getFloatTimeDomainData(master.peakBuf);
-    let peak = 0;
-    for (let i = 0; i < master.peakBuf.length; i++) peak = Math.max(peak, Math.abs(master.peakBuf[i]));
+    let peak = 0, sum = 0;
+    for (let i = 0; i < master.peakBuf.length; i++) { const s = master.peakBuf[i]; peak = Math.max(peak, Math.abs(s)); sum += s * s; }
     const v = Math.min(1, Math.max(0, (20 * Math.log10(peak + 1e-6) + 60) / 60));
     fill.style.width = `${Math.round(v * 100)}%`;
+    const loud = q('#masterLoud');
+    if (loud) { const db = 20 * Math.log10(Math.sqrt(sum / master.peakBuf.length) + 1e-6); loud.textContent = db < -60 ? '−∞ dB' : `${db.toFixed(1)} dB`; }
     const clip = q('#masterClip');
     if (clip) {
       if (peak >= 0.99) { clip.classList.add('lit'); master._clipAt = performance.now(); }
@@ -450,6 +472,69 @@
     renderChannels();
   }
 
+  // ---- Scenes: save / recall / delete full-mix snapshots (localStorage) ----
+  const SCENE_KEY = 'gaanasudha.studio.scenes';
+  const loadScenes = () => { try { return JSON.parse(localStorage.getItem(SCENE_KEY)) || {}; } catch { return {}; } };
+  const storeScenes = (o) => { try { localStorage.setItem(SCENE_KEY, JSON.stringify(o)); } catch (_) {} };
+
+  function captureScene() {
+    return {
+      master: {
+        gain: master.gain.gain.value, limiter: q('#limChk').checked,
+        reverbType: master.reverbType, reverbReturn: master.reverbReturn.gain.value,
+        mEq: [master.mEqLow.gain.value, master.mEqMid.gain.value, master.mEqHigh.gain.value],
+        duckOn: master.duckOn, duckThresh: master.duckThresh, duckAmt: master.duckAmt,
+        delayTime: master.delay.delayTime.value, delayFb: master.delayFb.gain.value,
+      },
+      channels: channels.map((ch) => ({
+        type: ch.type, libId: ch.libId || null, name: ch.name, role: ch.role,
+        eq: [ch.n.eqLow.gain.value, ch.n.eqMid.gain.value, ch.n.eqHigh.gain.value],
+        denoise: ch.denoise, comp: ch.comp, deEss: ch.deEss, autoLevel: ch.autoLevel,
+        fader: ch.n.fader.gain.value, pan: ch.n.pan ? ch.n.pan.pan.value : 0,
+        revSend: ch.n.revSend.gain.value, delaySend: ch.n.delaySend.gain.value, mute: ch.mute,
+      })),
+    };
+  }
+
+  function applyChannelSettings(ch, s) {
+    ch.role = s.role; ch.name = s.name;
+    ch.denoise = s.denoise; ch.comp = s.comp; ch.deEss = s.deEss; ch.autoLevel = s.autoLevel; ch.mute = s.mute;
+    ch.n.eqLow.gain.value = s.eq[0]; ch.n.eqMid.gain.value = s.eq[1]; ch.n.eqHigh.gain.value = s.eq[2];
+    ch.n.fader.gain.value = s.fader; if (ch.n.pan) ch.n.pan.pan.value = s.pan;
+    ch.n.revSend.gain.value = s.revSend; ch.n.delaySend.gain.value = s.delaySend || 0;
+    setComp(ch.n.comp, ch.comp); ch.n.hpf.frequency.value = ch.denoise ? 95 : 25;
+  }
+
+  function applyScene(scene) {
+    const m = scene.master;
+    master.gain.gain.value = m.gain; q('#masterFader').value = m.gain;
+    q('#limChk').checked = m.limiter; setLimiter(m.limiter);
+    setReverbType(m.reverbType); q('#revType').value = m.reverbType;
+    if (m.reverbType !== 'Off') master.reverbReturn.gain.value = m.reverbReturn;
+    q('#revReturn').value = m.reverbReturn;
+    master.mEqLow.gain.value = m.mEq[0]; master.mEqMid.gain.value = m.mEq[1]; master.mEqHigh.gain.value = m.mEq[2];
+    ['#mEqLow', '#mEqMid', '#mEqHigh'].forEach((s, i) => q(s) && (q(s).value = m.mEq[i]));
+    master.duckOn = m.duckOn; q('#duckChk').checked = m.duckOn;
+    master.duckThresh = m.duckThresh; q('#duckThresh').value = m.duckThresh;
+    master.duckAmt = m.duckAmt; q('#duckAmt').value = m.duckAmt;
+    master.delay.delayTime.value = m.delayTime; q('#delayTime') && (q('#delayTime').value = m.delayTime);
+    master.delayFb.gain.value = m.delayFb; q('#delayFb') && (q('#delayFb').value = m.delayFb);
+    channels.slice().forEach((ch) => removeChannel(ch.id));
+    let skipped = 0;
+    for (const s of scene.channels) {
+      if (s.libId) applyChannelSettings(addLibrary(s.libId, s.name, true), s);
+      else skipped++;
+    }
+    renderChannels();
+    toast(skipped ? `Scene recalled. Re-add ${skipped} mic/uploaded channel(s).` : 'Scene recalled');
+  }
+
+  function refreshSceneSelect(sel) {
+    const names = Object.keys(loadScenes());
+    q('#sceneSel').innerHTML = '<option value="">— recall scene —</option>' +
+      names.map((n) => `<option${n === sel ? ' selected' : ''}>${n.replace(/</g, '&lt;')}</option>`).join('');
+  }
+
   // ======================================================================
   //  UI
   // ======================================================================
@@ -467,6 +552,10 @@
       <label class="duck-toggle">Thresh <input type="range" id="duckThresh" min="0.005" max="0.15" step="0.005" value="0.03" /></label>
       <label class="duck-toggle">Amount <input type="range" id="duckAmt" min="0" max="1" step="0.02" value="0.28" /></label>
       <span class="sp"></span>
+      <select id="sceneSel" title="Recall a saved scene"><option value="">— recall scene —</option></select>
+      <button class="ghost tiny" id="sceneSave">💾 Save scene</button>
+      <button class="ghost tiny" id="sceneDel" title="Delete selected scene">🗑</button>
+      <span class="sp"></span>
       <button class="ghost" id="recBtn">⏺ Record</button>
       <a class="ghost tiny" id="recDownload" style="display:none">⬇ WebM</a>
       <a class="ghost tiny" id="recWav" style="display:none">⬇ WAV</a>
@@ -480,7 +569,15 @@
           <div class="master-meter"><div class="master-meter-fill" id="masterMeter"></div></div>
           <span class="clip-led" id="masterClip" title="Clip">CLIP</span>
         </div>
+        <div class="ms-loud"><span class="muted">Loudness</span> <b id="masterLoud">−∞ dB</b></div>
+        <div class="ms-eq">
+          <label class="knob"><span>LO</span><input type="range" id="mEqLow" min="-12" max="12" step="0.5" value="0" /></label>
+          <label class="knob"><span>MID</span><input type="range" id="mEqMid" min="-12" max="12" step="0.5" value="0" /></label>
+          <label class="knob"><span>HI</span><input type="range" id="mEqHigh" min="-12" max="12" step="0.5" value="0" /></label>
+        </div>
         <label class="ms-field">Limiter <input type="checkbox" id="limChk" checked /></label>
+        <label class="ms-field">Delay time <input type="range" id="delayTime" min="0.05" max="1" step="0.01" value="0.28" /></label>
+        <label class="ms-field">Delay fb <input type="range" id="delayFb" min="0" max="0.8" step="0.02" value="0.3" /></label>
         <label class="ms-field">Reverb type
           <select id="revType"><option>Off</option><option>Room</option><option selected>Hall</option><option>Plate</option></select>
         </label>
@@ -510,6 +607,7 @@
       </div>
       <button class="ghost tiny enhance" title="Voice enhance preset">✨ Voice</button>
       <label class="mini">Rev <input type="range" class="rev" min="0" max="1" step="0.01" value="${ch.n.revSend.gain.value}" /></label>
+      <label class="mini">Dly <input type="range" class="dly" min="0" max="1" step="0.01" value="${ch.n.delaySend.gain.value}" /></label>
       <label class="mini">Pan <input type="range" class="pan" min="-1" max="1" step="0.05" value="${ch.n.pan ? ch.n.pan.pan.value : 0}" /></label>
       <div class="fader-wrap">
         <div class="meter"><div class="meter-fill"></div></div>
@@ -553,6 +651,7 @@
       );
       el.querySelector('.enhance').addEventListener('click', () => voiceEnhance(ch));
       el.querySelector('.rev').addEventListener('input', (e) => (ch.n.revSend.gain.value = Number(e.target.value)));
+      el.querySelector('.dly').addEventListener('input', (e) => (ch.n.delaySend.gain.value = Number(e.target.value)));
       el.querySelector('.pan').addEventListener('input', (e) => { if (ch.n.pan) ch.n.pan.pan.value = Number(e.target.value); });
       el.querySelector('.fader').addEventListener('input', (e) => (ch.n.fader.gain.value = Number(e.target.value)));
       el.querySelector('.mute').addEventListener('click', (e) => { ch.mute = !ch.mute; e.target.classList.toggle('on', ch.mute); });
@@ -587,6 +686,40 @@
   q('#revType').addEventListener('change', (e) => { audio(); setReverbType(e.target.value); });
   q('#revReturn').addEventListener('input', (e) => { audio(); if (master.reverbType !== 'Off') master.reverbReturn.gain.value = Number(e.target.value); });
   q('#masterFader').addEventListener('input', (e) => { audio(); master.gain.gain.value = Number(e.target.value); });
+  q('#mEqLow').addEventListener('input', (e) => { audio(); master.mEqLow.gain.value = Number(e.target.value); });
+  q('#mEqMid').addEventListener('input', (e) => { audio(); master.mEqMid.gain.value = Number(e.target.value); });
+  q('#mEqHigh').addEventListener('input', (e) => { audio(); master.mEqHigh.gain.value = Number(e.target.value); });
+  q('#delayTime').addEventListener('input', (e) => { audio(); master.delay.delayTime.value = Number(e.target.value); });
+  q('#delayFb').addEventListener('input', (e) => { audio(); master.delayFb.gain.value = Number(e.target.value); });
+
+  // Scenes
+  q('#sceneSel').addEventListener('change', (e) => { if (e.target.value) applyScene(loadScenes()[e.target.value]); });
+  q('#sceneSave').addEventListener('click', () => {
+    audio();
+    const name = (prompt('Scene name:', `Scene ${Object.keys(loadScenes()).length + 1}`) || '').trim();
+    if (!name) return;
+    const scenes = loadScenes(); scenes[name] = captureScene(); storeScenes(scenes);
+    refreshSceneSelect(name); toast(`Saved scene “${name}”`);
+  });
+  q('#sceneDel').addEventListener('click', () => {
+    const sel = q('#sceneSel').value; if (!sel) return;
+    const scenes = loadScenes(); delete scenes[sel]; storeScenes(scenes); refreshSceneSelect();
+  });
+  refreshSceneSelect();
+
+  // Keyboard shortcuts (only while the Studio view is active, not while typing)
+  document.addEventListener('keydown', (e) => {
+    const view = document.getElementById('view-studio');
+    if (!view || !view.classList.contains('active')) return;
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (['input', 'select', 'textarea'].includes(tag)) return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      channels.some((ch) => ch.mediaEl && !ch.mediaEl.paused) ? stopAllPlay() : playAll();
+    } else if (e.key === 'r' || e.key === 'R') {
+      e.preventDefault(); toggleRecord();
+    }
+  });
 
   renderChannels();
 

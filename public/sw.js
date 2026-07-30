@@ -1,7 +1,7 @@
 // Service worker: installable app shell + offline caching.
 // Deliberately never intercepts /api/* (auth, data, and audio streaming with
 // Range requests) — those always go straight to the network.
-const CACHE = 'gaanasudha-v2';
+const CACHE = 'gaanasudha-v3';
 const SHELL = [
   '/',
   '/index.html',
