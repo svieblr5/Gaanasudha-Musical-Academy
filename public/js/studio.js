@@ -87,6 +87,8 @@
     master.analyser = ctx.createAnalyser();
     master.analyser.fftSize = 1024;
     master.peakBuf = new Float32Array(master.analyser.fftSize);
+    master.mains = 50; // mains-hum frequency for de-hum
+    master.msEMA = null; // rolling mean-square for the loudness estimate
 
     master.bus.connect(master.mEqLow);
     master.mEqLow.connect(master.mEqMid);
@@ -145,11 +147,17 @@
     n.highAn = c.createAnalyser(); n.highAn.fftSize = 1024;
     n.postAn = c.createAnalyser(); n.postAn.fftSize = 1024;
 
+    // De-hum notches (mains + 2 harmonics); 'allpass' = transparent when off.
+    n.hum1 = c.createBiquadFilter(); n.hum1.type = 'allpass';
+    n.hum2 = c.createBiquadFilter(); n.hum2.type = 'allpass';
+    n.hum3 = c.createBiquadFilter(); n.hum3.type = 'allpass';
+
     // wire the chain
     sourceNode.connect(n.inGain);
     n.inGain.connect(n.hpf);
     n.hpf.connect(n.preAn);
-    n.hpf.connect(n.gate);
+    n.hpf.connect(n.hum1); n.hum1.connect(n.hum2); n.hum2.connect(n.hum3);
+    n.hum3.connect(n.gate);
     n.gate.connect(n.eqLow); n.eqLow.connect(n.eqMid); n.eqMid.connect(n.eqHigh);
     n.eqHigh.connect(n.deEss);
     n.eqHigh.connect(n.highTap); n.highTap.connect(n.highAn);
@@ -174,11 +182,20 @@
       hbuf: new Float32Array(n.highAn.fftSize),
       mbuf: new Float32Array(n.postAn.fftSize),
       mute: false, solo: false,
-      denoise: false, comp: false, deEss: false, autoLevel: false,
+      denoise: false, comp: false, deEss: false, autoLevel: false, hum: false,
       gateThresh: 0.015,
     };
     channels.push(ch);
     return ch;
+  }
+
+  // De-hum: notch the mains frequency + 2 harmonics (transparent 'allpass' off).
+  function setHum(ch, on) {
+    const f = master.mains || 50;
+    [ch.n.hum1, ch.n.hum2, ch.n.hum3].forEach((nd, i) => {
+      if (on) { nd.type = 'notch'; nd.frequency.value = f * (i + 1); nd.Q.value = 25; }
+      else { nd.type = 'allpass'; }
+    });
   }
 
   function setComp(comp, on) {
@@ -380,8 +397,12 @@
     for (let i = 0; i < master.peakBuf.length; i++) { const s = master.peakBuf[i]; peak = Math.max(peak, Math.abs(s)); sum += s * s; }
     const v = Math.min(1, Math.max(0, (20 * Math.log10(peak + 1e-6) + 60) / 60));
     fill.style.width = `${Math.round(v * 100)}%`;
+    // Rolling loudness estimate (approx LUFS: -0.691 + 10·log10(mean square)).
+    const ms = sum / master.peakBuf.length;
+    master.msEMA = master.msEMA == null ? ms : master.msEMA * 0.95 + ms * 0.05;
+    master.lufs = -0.691 + 10 * Math.log10(master.msEMA + 1e-9);
     const loud = q('#masterLoud');
-    if (loud) { const db = 20 * Math.log10(Math.sqrt(sum / master.peakBuf.length) + 1e-6); loud.textContent = db < -60 ? '−∞ dB' : `${db.toFixed(1)} dB`; }
+    if (loud) loud.textContent = master.lufs < -70 ? '−∞ LUFS' : `${master.lufs.toFixed(1)} LUFS`;
     const clip = q('#masterClip');
     if (clip) {
       if (peak >= 0.99) { clip.classList.add('lit'); master._clipAt = performance.now(); }
@@ -460,6 +481,27 @@
     setTimeout(() => t.classList.remove('show'), 2600);
   }
 
+  // ---- Loudness normalize (Auphonic-style) + Auto-master (LANDR-style) --
+  function normalizeLoudness(target, quiet) {
+    audio();
+    if (master.lufs == null || master.lufs < -70) { if (!quiet) toast('Play audio first to measure loudness'); return; }
+    const delta = target - master.lufs;
+    const g = Math.min(4, Math.max(0.05, master.gain.gain.value * 10 ** (delta / 20)));
+    master.gain.gain.setTargetAtTime(g, ctx.currentTime, 0.25);
+    q('#masterFader').value = g.toFixed(2);
+    if (!quiet) toast(`Normalizing toward ${target} LUFS`);
+  }
+
+  function autoMaster() {
+    audio();
+    // Tonal-balance master EQ (gentle: warm lows, tamed mud, airy highs).
+    master.mEqLow.gain.value = 1.5; master.mEqMid.gain.value = -1; master.mEqHigh.gain.value = 2;
+    ['#mEqLow', '#mEqMid', '#mEqHigh'].forEach((s, i) => q(s) && (q(s).value = [1.5, -1, 2][i]));
+    q('#limChk').checked = true; setLimiter(true);
+    normalizeLoudness(Number(q('#loudTarget').value), true);
+    toast('✨ Auto-master applied');
+  }
+
   // ---- Voice enhance preset --------------------------------------------
   function voiceEnhance(ch) {
     ch.role = 'voice';
@@ -485,11 +527,12 @@
         mEq: [master.mEqLow.gain.value, master.mEqMid.gain.value, master.mEqHigh.gain.value],
         duckOn: master.duckOn, duckThresh: master.duckThresh, duckAmt: master.duckAmt,
         delayTime: master.delay.delayTime.value, delayFb: master.delayFb.gain.value,
+        mains: master.mains,
       },
       channels: channels.map((ch) => ({
         type: ch.type, libId: ch.libId || null, name: ch.name, role: ch.role,
         eq: [ch.n.eqLow.gain.value, ch.n.eqMid.gain.value, ch.n.eqHigh.gain.value],
-        denoise: ch.denoise, comp: ch.comp, deEss: ch.deEss, autoLevel: ch.autoLevel,
+        denoise: ch.denoise, comp: ch.comp, deEss: ch.deEss, autoLevel: ch.autoLevel, hum: ch.hum,
         fader: ch.n.fader.gain.value, pan: ch.n.pan ? ch.n.pan.pan.value : 0,
         revSend: ch.n.revSend.gain.value, delaySend: ch.n.delaySend.gain.value, mute: ch.mute,
       })),
@@ -499,10 +542,11 @@
   function applyChannelSettings(ch, s) {
     ch.role = s.role; ch.name = s.name;
     ch.denoise = s.denoise; ch.comp = s.comp; ch.deEss = s.deEss; ch.autoLevel = s.autoLevel; ch.mute = s.mute;
+    ch.hum = s.hum || false;
     ch.n.eqLow.gain.value = s.eq[0]; ch.n.eqMid.gain.value = s.eq[1]; ch.n.eqHigh.gain.value = s.eq[2];
     ch.n.fader.gain.value = s.fader; if (ch.n.pan) ch.n.pan.pan.value = s.pan;
     ch.n.revSend.gain.value = s.revSend; ch.n.delaySend.gain.value = s.delaySend || 0;
-    setComp(ch.n.comp, ch.comp); ch.n.hpf.frequency.value = ch.denoise ? 95 : 25;
+    setComp(ch.n.comp, ch.comp); ch.n.hpf.frequency.value = ch.denoise ? 95 : 25; setHum(ch, ch.hum);
   }
 
   function applyScene(scene) {
@@ -519,6 +563,7 @@
     master.duckAmt = m.duckAmt; q('#duckAmt').value = m.duckAmt;
     master.delay.delayTime.value = m.delayTime; q('#delayTime') && (q('#delayTime').value = m.delayTime);
     master.delayFb.gain.value = m.delayFb; q('#delayFb') && (q('#delayFb').value = m.delayFb);
+    master.mains = m.mains || 50; q('#mainsSel') && (q('#mainsSel').value = master.mains);
     channels.slice().forEach((ch) => removeChannel(ch.id));
     let skipped = 0;
     for (const s of scene.channels) {
@@ -569,7 +614,21 @@
           <div class="master-meter"><div class="master-meter-fill" id="masterMeter"></div></div>
           <span class="clip-led" id="masterClip" title="Clip">CLIP</span>
         </div>
-        <div class="ms-loud"><span class="muted">Loudness</span> <b id="masterLoud">−∞ dB</b></div>
+        <div class="ms-loud"><span class="muted">Loudness</span> <b id="masterLoud">−∞ LUFS</b></div>
+        <label class="ms-field">Target
+          <select id="loudTarget">
+            <option value="-14" selected>−14 (streaming)</option>
+            <option value="-16">−16</option>
+            <option value="-23">−23 (broadcast)</option>
+          </select>
+        </label>
+        <div class="row" style="gap:6px">
+          <button class="ghost tiny" id="normalizeBtn" style="flex:1">📏 Normalize</button>
+          <button class="gold tiny" id="autoMasterBtn" style="flex:1">✨ Auto-master</button>
+        </div>
+        <label class="ms-field">Mains hum
+          <select id="mainsSel"><option value="50" selected>50 Hz</option><option value="60">60 Hz</option></select>
+        </label>
         <div class="ms-eq">
           <label class="knob"><span>LO</span><input type="range" id="mEqLow" min="-12" max="12" step="0.5" value="0" /></label>
           <label class="knob"><span>MID</span><input type="range" id="mEqMid" min="-12" max="12" step="0.5" value="0" /></label>
@@ -604,6 +663,7 @@
         <button class="fx ${ch.comp ? 'on' : ''}" data-fx="comp" title="Compressor">CMP</button>
         <button class="fx ${ch.deEss ? 'on' : ''}" data-fx="deEss" title="De-esser">DS</button>
         <button class="fx ${ch.autoLevel ? 'on' : ''}" data-fx="autoLevel" title="Auto-level (AGC)">AUTO</button>
+        <button class="fx ${ch.hum ? 'on' : ''}" data-fx="hum" title="De-hum (mains 50/60 Hz notch)">HUM</button>
       </div>
       <button class="ghost tiny enhance" title="Voice enhance preset">✨ Voice</button>
       <label class="mini">Rev <input type="range" class="rev" min="0" max="1" step="0.01" value="${ch.n.revSend.gain.value}" /></label>
@@ -647,6 +707,7 @@
           if (fx === 'comp') setComp(ch.n.comp, ch.comp);
           if (fx === 'denoise') ch.n.hpf.frequency.value = ch.denoise ? 95 : 25;
           if (fx === 'deEss' && !ch.deEss) ch.n.deEss.gain.value = 0;
+          if (fx === 'hum') setHum(ch, ch.hum);
         }),
       );
       el.querySelector('.enhance').addEventListener('click', () => voiceEnhance(ch));
@@ -691,6 +752,12 @@
   q('#mEqHigh').addEventListener('input', (e) => { audio(); master.mEqHigh.gain.value = Number(e.target.value); });
   q('#delayTime').addEventListener('input', (e) => { audio(); master.delay.delayTime.value = Number(e.target.value); });
   q('#delayFb').addEventListener('input', (e) => { audio(); master.delayFb.gain.value = Number(e.target.value); });
+  q('#normalizeBtn').addEventListener('click', () => normalizeLoudness(Number(q('#loudTarget').value)));
+  q('#autoMasterBtn').addEventListener('click', autoMaster);
+  q('#mainsSel').addEventListener('change', (e) => {
+    audio(); master.mains = Number(e.target.value);
+    channels.forEach((ch) => ch.hum && setHum(ch, true)); // re-tune active de-hum
+  });
 
   // Scenes
   q('#sceneSel').addEventListener('change', (e) => { if (e.target.value) applyScene(loadScenes()[e.target.value]); });
