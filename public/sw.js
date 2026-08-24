@@ -1,7 +1,7 @@
 // Service worker: installable app shell + offline caching.
 // Deliberately never intercepts /api/* (auth, data, and audio streaming with
 // Range requests) — those always go straight to the network.
-const CACHE = 'gaanasudha-v6';
+const CACHE = 'gaanasudha-v7';
 const SHELL = [
   '/',
   '/index.html',
@@ -46,7 +46,28 @@ self.addEventListener('fetch', (e) => {
   // changes take effect immediately instead of one page-load late.
   if (url.pathname.startsWith('/cms/')) return;
 
-  // Stale-while-revalidate for same-origin static assets.
+  // Navigations / HTML documents: network-first, so the app shell (menu, theme
+  // links, scripts) is always current when online and can't get stuck on a
+  // stale cached copy. Falls back to cache only when offline.
+  const isDocument = req.mode === 'navigate' ||
+    (req.destination === 'document') ||
+    (req.headers.get('accept') || '').includes('text/html');
+  if (isDocument) {
+    e.respondWith(
+      caches.open(CACHE).then(async (cache) => {
+        try {
+          const res = await fetch(req);
+          if (res && res.status === 200 && res.type === 'basic') cache.put(req, res.clone());
+          return res;
+        } catch {
+          return (await cache.match(req)) || (await cache.match('/index.html'));
+        }
+      }),
+    );
+    return;
+  }
+
+  // Other static assets (CSS/JS/icons): stale-while-revalidate for speed.
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(req);
