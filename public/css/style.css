@@ -634,3 +634,32 @@ tbody tr.playing { background: rgba(108, 92, 231, 0.18); }
 .snr-row { display: flex; gap: 4px; width: 100%; }
 .snr-row button { flex: 1; }
 .fx-row { flex-wrap: wrap; }
+
+/* ---------- CMS: announcement / footer / hero ---------- */
+.cms-announce {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 9px 44px 9px 16px; position: relative; z-index: 60;
+  font-size: 14px; font-weight: 500; text-align: center; color: #fff;
+}
+.cms-announce a { color: inherit; text-decoration: underline; }
+.cms-announce-accent { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.cms-announce-gold { background: linear-gradient(90deg, var(--gold), var(--gold-2)); color: #22160a; }
+.cms-announce-ok { background: var(--ok); color: #062616; }
+.cms-announce-danger { background: var(--danger); }
+.cms-announce-x {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: transparent; color: inherit; padding: 2px 8px; font-size: 15px; border-radius: 6px;
+}
+.cms-announce-x:hover { background: rgba(0, 0, 0, 0.18); }
+.cms-footer {
+  text-align: center; color: var(--muted); font-size: 13px;
+  padding: 18px 16px; border-top: 1px solid var(--border);
+}
+.cms-hero {
+  border-radius: var(--radius); padding: 40px 28px; margin: 4px 0 22px;
+  background: linear-gradient(135deg, var(--panel), var(--panel-2));
+  background-size: cover; background-position: center; box-shadow: var(--shadow);
+}
+.cms-hero-center { text-align: center; }
+.cms-hero h1 { margin: 0 0 8px; font-size: 2rem; }
+.cms-hero p { margin: 0; color: var(--muted); font-size: 1.05rem; }

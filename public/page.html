@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gaanasudha Musical Academy</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎼</text></svg>" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/cms/theme.css" />
+  <style>
+    .page-wrap { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
+    .page-top { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+    .page-top .logo { font-size: 26px; }
+    .page-top .title { font-weight: 600; font-size: 18px; }
+    .page-top .spacer { flex: 1; }
+    .page-body { line-height: 1.7; }
+    .page-body h1 { margin-top: 0; }
+    .page-body img { max-width: 100%; border-radius: var(--radius); }
+    .page-body a { color: var(--gold-2); }
+    .page-body table { border-collapse: collapse; width: 100%; }
+    .page-body td, .page-body th { border: 1px solid var(--border); padding: 8px 10px; }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-top">
+      <span class="logo" id="brandLogo">🎼</span>
+      <span class="title" id="brandTitle">Gaanasudha</span>
+      <span class="spacer"></span>
+      <a href="/"><button class="ghost tiny">← Back to library</button></a>
+    </div>
+    <div id="pageContent" class="page-body">
+      <p class="sub">Loading…</p>
+    </div>
+  </div>
+  <script>
+    (async function () {
+      const slug = decodeURIComponent(location.pathname.replace(/^\/page\//, '').replace(/\/$/, ''));
+      const el = document.getElementById('pageContent');
+      try {
+        const r = await fetch('/api/cms/pages/' + encodeURIComponent(slug), { credentials: 'same-origin' });
+        if (!r.ok) throw new Error();
+        const page = await r.json();
+        document.title = page.title + ' · Gaanasudha';
+        el.innerHTML = '<h1>' + (page.icon ? page.icon + ' ' : '') + escapeHtml(page.title) + '</h1>' + page.body;
+      } catch {
+        el.innerHTML = '<h1>Page not found</h1><p class="sub">This page does not exist or is not published.</p>';
+      }
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+      }
+    })();
+  </script>
+  <script src="/js/cms-client.js"></script>
+</body>
+</html>

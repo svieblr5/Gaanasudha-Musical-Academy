@@ -7,7 +7,7 @@ import compression from 'compression';
 import QRCode from 'qrcode';
 
 import {
-  PORT, PUBLIC_DIR, MUSIC_DIR, SESSION_SECRET, MIME,
+  PORT, PUBLIC_DIR, MUSIC_DIR, DATA_DIR, SESSION_SECRET, MIME,
 } from './src/config.js';
 import * as auth from './src/auth.js';
 import * as lib from './src/library.js';
@@ -17,6 +17,7 @@ import * as favorites from './src/favorites.js';
 import * as history from './src/history.js';
 import * as recommend from './src/recommend.js';
 import * as ratelimit from './src/ratelimit.js';
+import * as cms from './src/cms.js';
 import { FileSessionStore } from './src/session-store.js';
 
 const app = express();
@@ -45,11 +46,13 @@ app.use((req, res, next) => {
       "img-src 'self' data:",
       // blob: needed for uploaded-file playback + recorded-mix download in Studio.
       "media-src 'self' blob:",
-      "style-src 'self' 'unsafe-inline'",
+      // fonts.googleapis.com: CMS-selected Google Fonts stylesheet (@import in
+      // /cms/theme.css). fonts.gstatic.com: the font files themselves.
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "script-src 'self' 'unsafe-inline'",
       "worker-src 'self'",
       "connect-src 'self'",
-      "font-src 'self'",
+      "font-src 'self' https://fonts.gstatic.com",
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'self'",
@@ -551,6 +554,108 @@ app.delete('/api/admin/users/:id', auth.requireAuth, auth.requireAdmin, (req, re
   res.json({ ok: true });
 });
 
+// ===========================================================================
+// CMS — site builder (theme, fonts, navigation, pages, branding)
+// ===========================================================================
+const CMS_MEDIA_DIR = path.join(DATA_DIR, 'cms-media');
+
+// ---- Public: consumed by every page via cms-client.js ----
+app.get('/api/cms/config', (req, res) => {
+  res.set('Cache-Control', 'no-cache').json(cms.clientConfig(cms.getConfig()));
+});
+
+// Live theme stylesheet (CSS variables + fonts + custom CSS).
+app.get('/cms/theme.css', (req, res) => {
+  res.set('Content-Type', 'text/css; charset=utf-8');
+  res.set('Cache-Control', 'no-cache');
+  res.send(cms.buildThemeCss(cms.getConfig()));
+});
+
+// Public read of a single published custom page (by slug).
+app.get('/api/cms/pages/:slug', (req, res) => {
+  const page = cms.getPage(req.params.slug);
+  if (!page || !page.published) return res.status(404).json({ error: 'Page not found' });
+  res.json(page);
+});
+
+// Serve uploaded branding media (logo / favicon / hero images).
+app.get('/media/:file', (req, res) => {
+  const safe = path.basename(req.params.file).replace(/[/\\?%*:|"<>]/g, '_');
+  const p = path.join(CMS_MEDIA_DIR, safe);
+  if (!fs.existsSync(p)) return res.status(404).end();
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.sendFile(p);
+});
+
+// ---- Admin: full config + editing ----
+app.get('/api/cms', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  res.json({ config: cms.getConfig(), fontPresets: cms.FONT_PRESETS, defaults: cms.DEFAULTS });
+});
+
+app.put('/api/cms', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  try {
+    res.json(cms.saveConfig(req.body || {}));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.post('/api/cms/reset', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  res.json(cms.reset());
+});
+
+app.get('/api/cms/export', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  res.set('Content-Disposition', 'attachment; filename="gaanasudha-cms.json"');
+  res.json(cms.getConfig());
+});
+
+app.post('/api/cms/import', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  try {
+    res.json(cms.replaceConfig(req.body || {}));
+  } catch (e) {
+    res.status(400).json({ error: 'Invalid config: ' + e.message });
+  }
+});
+
+// ---- Admin: custom pages ----
+app.post('/api/cms/pages', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  res.json(cms.upsertPage(req.body || {}));
+});
+
+app.delete('/api/cms/pages/:id', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  if (!cms.deletePage(req.params.id)) return res.status(404).json({ error: 'Page not found' });
+  res.json({ ok: true });
+});
+
+// ---- Admin: branding media upload ----
+const mediaUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      fs.mkdirSync(CMS_MEDIA_DIR, { recursive: true });
+      cb(null, CMS_MEDIA_DIR);
+    },
+    filename: (req, file, cb) => {
+      const ext = (path.extname(file.originalname) || '.png').replace(/[^.a-z0-9]/gi, '');
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (req, file, cb) => {
+    cb(null, /^image\//.test(file.mimetype));
+  },
+});
+
+app.post(
+  '/api/cms/media',
+  auth.requireAuth,
+  auth.requireAdmin,
+  mediaUpload.single('file'),
+  (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'An image file is required' });
+    res.json({ ok: true, url: `/media/${req.file.filename}` });
+  },
+);
+
 // Lightweight health check (for uptime monitors / the tunnel).
 app.get('/healthz', (req, res) => {
   res.json({ ok: true, tracks: lib.stats().tracks, uptime: Math.round(process.uptime()) });
@@ -563,6 +668,11 @@ app.use(express.static(PUBLIC_DIR));
 
 app.get('/share/:token', (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'share.html'));
+});
+
+// Custom CMS pages render through a shared shell that loads the page by slug.
+app.get('/page/:slug', (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'page.html'));
 });
 
 // Unmatched API routes get a clean JSON 404 (not the HTML default).
