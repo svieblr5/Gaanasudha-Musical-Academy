@@ -580,6 +580,7 @@ app.use((err, req, res, next) => {
 // Startup
 // ---------------------------------------------------------------------------
 auth.seedAdmin();
+auth.warnIfDefaultAdminPassword();
 const cachedCount = lib.loadCachedLibrary();
 console.log(`\n  Gaanasudha Music Portal`);
 console.log(`  Loaded ${cachedCount} track(s) from cache.`);

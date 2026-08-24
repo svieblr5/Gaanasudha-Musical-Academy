@@ -38,11 +38,10 @@ npm start        # start the server
 
 Then open **http://localhost:3000** in a browser.
 
-On first launch a default administrator account is created:
-
-| Username | Password   |
-|----------|------------|
-| `admin`  | `admin123` |
+On first launch a default administrator account (`admin`) is created. Its
+password is taken from the `ADMIN_PASSWORD` environment variable if set;
+otherwise a strong random password is generated and **printed once to the
+console at startup** — copy it from there to log in.
 
 **Log in and change this password immediately** (My Account → Change password).
 

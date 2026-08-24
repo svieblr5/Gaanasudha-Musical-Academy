@@ -25,8 +25,12 @@ function resolveSessionSecret() {
     const secret = crypto.randomBytes(32).toString('hex');
     fs.writeFileSync(file, secret);
     return secret;
-  } catch {
-    return 'gaanasudha-insecure-fallback-secret';
+  } catch (err) {
+    // Couldn't read or persist a secret (e.g. read-only data dir). Fall back to
+    // a random per-process secret rather than a predictable shared one. Sessions
+    // won't survive a restart, but they stay unforgeable.
+    console.warn(`  [config] Could not persist session secret (${err.code || err.message}); using an ephemeral one. Set SESSION_SECRET to keep sessions across restarts.`);
+    return crypto.randomBytes(32).toString('hex');
   }
 }
 

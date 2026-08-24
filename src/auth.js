@@ -64,20 +64,38 @@ export function publicUser(user) {
   return rest;
 }
 
-// On first run, create a default admin so the operator can log in.
+// On first run, create a default admin so the operator can log in. The password
+// comes from ADMIN_PASSWORD if set; otherwise a strong random one is generated
+// and printed once. No credential is baked into the source.
 export function seedAdmin() {
   const users = loadUsers();
   if (users.length > 0) return;
+  const fromEnv = process.env.ADMIN_PASSWORD && String(process.env.ADMIN_PASSWORD);
+  const password = fromEnv || crypto.randomBytes(9).toString('base64url');
   createUser({
     username: 'admin',
-    password: 'admin123',
+    password,
     displayName: 'Administrator',
     role: 'admin',
   });
   console.log('  Created default admin account:');
   console.log('     username: admin');
-  console.log('     password: admin123');
-  console.log('  >>> Log in and change this password immediately. <<<');
+  if (fromEnv) {
+    console.log('     password: (from ADMIN_PASSWORD)');
+  } else {
+    console.log(`     password: ${password}`);
+    console.log('  >>> Shown once. Log in and change it now (My Account → Change password). <<<');
+  }
+}
+
+// Guard for installs seeded with the old public default: warn loudly at startup
+// if the admin account still uses it, so it can't quietly linger in production.
+export function warnIfDefaultAdminPassword() {
+  const admin = findUser('admin');
+  if (admin && verifyPassword('admin123', admin.password)) {
+    console.warn('  >>> SECURITY: the "admin" account still uses the old default password.');
+    console.warn('  >>> Change it now (My Account → Change password) — this default is public.');
+  }
 }
 
 // --- Express middleware ---
