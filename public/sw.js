@@ -1,7 +1,7 @@
 // Service worker: installable app shell + offline caching.
 // Deliberately never intercepts /api/* (auth, data, and audio streaming with
 // Range requests) — those always go straight to the network.
-const CACHE = 'gaanasudha-v7';
+const CACHE = 'gaanasudha-v8';
 const SHELL = [
   '/',
   '/index.html',
@@ -22,9 +22,15 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()),
-  );
+  // Note: no automatic skipWaiting — an updated worker stays in "waiting" until
+  // the page tells it to activate (via the "Refresh" update prompt below). A
+  // brand-new install with no existing controller still activates immediately.
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
+});
+
+// The page posts this when the user clicks "Refresh" on the update prompt.
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
