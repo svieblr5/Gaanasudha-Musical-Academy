@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset app cache · Gaanasudha</title>
+  <style>
+    body { margin:0; min-height:100vh; display:grid; place-items:center;
+      font-family:system-ui,"Segoe UI",sans-serif; background:#120f08; color:#f6ecd8; padding:24px; }
+    .card { max-width:440px; text-align:center; background:#241d12; border:1px solid #3a2f1c;
+      border-radius:16px; padding:32px 28px; box-shadow:0 10px 40px rgba(0,0,0,.45); }
+    .logo { font-size:44px; }
+    h1 { font-size:20px; margin:10px 0 6px; }
+    p { color:#bfa982; font-size:14px; line-height:1.5; margin:0 0 18px; }
+    #status { font-size:14px; min-height:22px; margin-top:10px; }
+    .ok { color:#7bbf6a; }
+    a.btn { display:inline-block; background:#e5b567; color:#22160a; text-decoration:none;
+      border-radius:10px; padding:11px 20px; font-weight:600; margin-top:6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🧹</div>
+    <h1>Refreshing the app…</h1>
+    <p>Clearing the old cached version so you get the latest portal. This takes a second.</p>
+    <div id="status">Working…</div>
+    <a class="btn" id="goBtn" href="/" style="display:none">Open the portal →</a>
+  </div>
+  <script>
+    (async function () {
+      const status = document.getElementById('status');
+      try {
+        // 1) Unregister every service worker for this site.
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        // 2) Delete every cache.
+        if (window.caches) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        status.innerHTML = '<span class="ok">✓ Done. Reloading the latest version…</span>';
+        // 3) Hard reload into the app after a short beat.
+        setTimeout(() => { window.location.replace('/?fresh=' + Date.now()); }, 1200);
+      } catch (e) {
+        status.textContent = 'Could not auto-clear (' + e.message + '). Tap the button below.';
+        document.getElementById('goBtn').style.display = 'inline-block';
+      }
+    })();
+  </script>
+</body>
+</html>
