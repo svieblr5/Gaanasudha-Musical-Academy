@@ -1,6 +1,6 @@
 # Publishing the portal at your Hostinger domain (no Cloudflare)
 
-Goal: reach the app at `https://music.gaanasudhamusic.com` from anywhere, with the
+Goal: reach the app at `https://www.gaanasudhamusic.com` from anywhere, with the
 app + music staying on this PC. Hostinger only provides the domain/DNS.
 
 > **Current status (interim):** the portal is ALREADY public via an ngrok tunnel
@@ -15,7 +15,7 @@ app + music staying on this PC. Hostinger only provides the domain/DNS.
   (auto-start). Dependencies are installed; if you ever move/rebuild, run
   `npm ci` in the project folder (it now includes `compression`).
 - **Caddy** is installed and `deploy\Caddyfile` is pre-set to
-  `music.gaanasudhamusic.com` with HTTPS, HSTS and compression.
+  `www.gaanasudhamusic.com` with HTTPS, HSTS and compression.
 - Health check: `curl http://localhost:3080/healthz` → `{"ok":true,...}`.
 
 ```
@@ -64,19 +64,20 @@ change.
 1. hPanel → **Domains → DNS / Nameservers → Manage DNS Records**.
 2. Add an **A record**:
    - Type: `A`
-   - Name/Host: `music`   (creates `music.YOURDOMAIN.com`)
+   - Name/Host: `www`   (creates `www.YOURDOMAIN.com`)
    - Points to: `113.30.145.92`
    - TTL: `300` (low, so changes propagate fast)
-3. Leave your existing website records (`@`, `www`) untouched.
+3. Optional: point the bare domain `@` at the same IP (or add a redirect from
+   `gaanasudhamusic.com` → `www.gaanasudhamusic.com`) if you want the apex to work too.
 
 Wait a few minutes, then verify from this PC:
 ```powershell
-Resolve-DnsName music.YOURDOMAIN.com
+Resolve-DnsName www.YOURDOMAIN.com
 ```
 It should return `113.30.145.92`.
 
 ## Step 5 — Run Caddy (already pointed at your domain)
-`deploy\Caddyfile` is already set to `music.gaanasudhamusic.com` (edit it only if
+`deploy\Caddyfile` is already set to `www.gaanasudhamusic.com` (edit it only if
 your subdomain differs), then test-run:
 
 ```powershell
@@ -85,7 +86,7 @@ caddy run --config "G:\Gaanasudha Musical Academy\deploy\Caddyfile"
 
 Caddy will fetch a Let's Encrypt certificate automatically (this only succeeds
 once Steps 3–4 are done and ports 80/443 reach this PC). Watch for a line like
-`certificate obtained successfully`. Then open `https://music.gaanasudhamusic.com`.
+`certificate obtained successfully`. Then open `https://www.gaanasudhamusic.com`.
 
 ## Step 6 — Run Caddy automatically at boot
 Once the test run works, install Caddy as a Windows service so it starts with
@@ -98,16 +99,15 @@ the PC (like the app service). See `deploy\install-caddy-service.ps1`.
 2. ☐ Step 1 — reserve this PC's LAN IP (`10.10.30.54`).
 3. ☐ Step 2 — open Windows firewall 80/443.
 4. ☐ Step 3 — forward 80/443 through both routers to this PC.
-5. ☐ Step 4 — add the `music` A record → `113.30.145.92`; confirm with `Resolve-DnsName`.
-6. ☐ Step 5 — `caddy run …`; wait for "certificate obtained"; open `https://music.gaanasudhamusic.com`.
+5. ☐ Step 4 — add the `www` A record → `113.30.145.92`; confirm with `Resolve-DnsName`.
+6. ☐ Step 5 — `caddy run …`; wait for "certificate obtained"; open `https://www.gaanasudhamusic.com`.
 7. ☐ Step 6 — install Caddy as a Windows service (auto-start).
-8. ☐ Verify: `https://music.gaanasudhamusic.com/healthz` returns `{"ok":true}` and login works.
+8. ☐ Verify: `https://www.gaanasudhamusic.com/healthz` returns `{"ok":true}` and login works.
 
 ## After go-live
-- **QR poster / share links:** they currently point at the ngrok URL. To repoint
-  them at the domain, edit the `URL` in `scripts/build-practice-qr.mjs` (and
-  regenerate the standalone with `scripts/build-practice-html.mjs`), then rerun:
-  `node scripts/build-practice-qr.mjs`.
+- **QR poster / share links:** no action needed — they build their URLs from the
+  address the page is served on (`location.origin`), so they automatically use
+  `https://www.gaanasudhamusic.com/...` the moment the site is reached there.
 - **ngrok:** you can keep it as a backup or stop it — `Stop-Service ngrok`
   (and set it to Manual start) once the domain is proven.
 - **Secure cookies** switch on automatically over HTTPS (the app uses
