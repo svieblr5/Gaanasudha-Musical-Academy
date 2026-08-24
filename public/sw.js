@@ -1,7 +1,7 @@
 // Service worker: installable app shell + offline caching.
 // Deliberately never intercepts /api/* (auth, data, and audio streaming with
 // Range requests) — those always go straight to the network.
-const CACHE = 'gaanasudha-v5';
+const CACHE = 'gaanasudha-v6';
 const SHELL = [
   '/',
   '/index.html',
@@ -9,6 +9,7 @@ const SHELL = [
   '/practice.html',
   '/css/style.css',
   '/js/app.js',
+  '/js/cms-client.js',
   '/js/login.js',
   '/js/practice-tools.js',
   '/js/pitch-shift-worklet.js',
@@ -41,6 +42,9 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return; // never cache API / streams / auth
+  // /cms/theme.css is the live CMS theme — always fetch fresh so branding/colour
+  // changes take effect immediately instead of one page-load late.
+  if (url.pathname.startsWith('/cms/')) return;
 
   // Stale-while-revalidate for same-origin static assets.
   e.respondWith(

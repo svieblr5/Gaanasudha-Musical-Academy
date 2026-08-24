@@ -127,10 +127,29 @@
     home.insertBefore(hero, home.firstChild);
   }
 
+  // Which views each toggleable feature controls (Features section in the CMS).
+  const FEATURE_VIEWS = {
+    studio: ['studio'], practice: ['practice', 'practice-share'],
+    shares: ['shares'], playlists: ['playlists'], uploads: ['upload'],
+  };
+
+  // Views hidden because their feature is switched off.
+  function disabledViews(features) {
+    const off = new Set();
+    if (!features) return off;
+    for (const [feat, views] of Object.entries(FEATURE_VIEWS)) {
+      if (features[feat] === false) views.forEach((v) => off.add(v));
+    }
+    return off;
+  }
+
   // ---- Sidebar menu: reorder / rename / hide + custom links & pages ----
   function applyNavigation(cfg, isAdmin) {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar || !Array.isArray(cfg.navigation)) return;
+    const off = disabledViews(cfg.features);
+    // Hide the view panels for switched-off features so they can't be reached.
+    off.forEach((v) => { const el = document.getElementById('view-' + v); if (el) el.style.display = 'none'; });
 
     // Map existing core nav nodes by their data-view (keeps their app.js bindings).
     const existing = {};
@@ -153,6 +172,7 @@
     cfg.navigation.forEach((item) => {
       if (!item.visible) return;
       if (item.adminOnly && !isAdmin) return;
+      if (item.view && off.has(item.view)) return; // feature switched off
       addSep(item.section);
 
       let node = existing[item.view];

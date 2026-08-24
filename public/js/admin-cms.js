@@ -254,8 +254,11 @@
           h('input', { class: 'li-ico', style: 'width:44px;text-align:center', value: it.icon || '', oninput: (e) => { it.icon = e.target.value; markDirty(); } }),
           h('input', { class: 'li-label', value: it.label || '', oninput: (e) => { it.label = e.target.value; markDirty(); } }),
           h('input', { class: 'li-sec', placeholder: 'Section', value: it.section || '', oninput: (e) => { it.section = e.target.value; markDirty(); } }),
+          it.href !== undefined
+            ? h('input', { class: 'li-sec', type: 'url', placeholder: 'https://…', value: it.href || '', oninput: (e) => { it.href = e.target.value; markDirty(); } })
+            : null,
           it.adminOnly ? h('span', { class: 'li-badge' }, 'admin') : null,
-          it.href ? h('span', { class: 'li-badge' }, 'link') : null,
+          (it.href !== undefined && !it.adminOnly) ? h('span', { class: 'li-badge' }, 'link') : null,
           h('label', { class: 'switch', title: 'Visible' },
             (() => { const c = h('input', { type: 'checkbox', onchange: (e) => { it.visible = e.target.checked; markDirty(); } }); if (it.visible) c.checked = true; return c; })(),
             h('span', { class: 'track' })),
@@ -285,7 +288,7 @@
             markDirty(); redraw();
           },
         }, '＋ Add custom link')),
-      h('p', { class: 'hint2' }, 'Custom links open their URL. Core items navigate inside the app. Set a link’s URL by editing it after adding (via Advanced → export) — or use Pages for rich content.'),
+      h('p', { class: 'hint2' }, 'Core items navigate inside the app. Custom links show a URL field — set where they point. Use Pages for rich in-site content.'),
     ];
   }
 
@@ -412,10 +415,11 @@
   }
 
   function renderFeatures() {
-    const labels = { studio: 'Studio / Mixer', practice: 'Practice tools', shares: 'Share links', playlists: 'Playlists', uploads: 'Uploads', downloads: 'Downloads', lyrics: 'Lyrics', radio: 'Radio / autoplay' };
+    // Only toggles that are actually enforced (hide the menu entry + its view).
+    const labels = { studio: 'Studio / Mixer', practice: 'Practice tools', shares: 'Share links', playlists: 'Playlists', uploads: 'Uploads' };
     return [
       h('h2', null, 'Features'),
-      h('p', { class: 'desc' }, 'Turn portal features on or off. (Also hide their menu entries under Menu.)'),
+      h('p', { class: 'desc' }, 'Switch whole sections off — this hides their menu entry and blocks the page for everyone.'),
       h('div', { class: 'card' }, Object.entries(labels).map(([k, l]) => toggle('features.' + k, l))),
     ];
   }
